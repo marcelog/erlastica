@@ -5,7 +5,7 @@ Erlang library to use ElasticSearch. This is a work in progress.
 
 How to use it
 =============
- * Start the main supervisor [egetter_sup](https://github.com/marcelog/erlastica/blob/master/src/egetter_sup.erl) from your own supervisor
+ * Start the main supervisor [erlastica_sup](https://github.com/marcelog/erlastica/blob/master/src/egetter_sup.erl) from your own supervisor
 tree. Or application:start(erlastica).
 
  * Configure the application, here's a sample:
