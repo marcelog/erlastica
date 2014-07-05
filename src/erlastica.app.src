@@ -1,0 +1,21 @@
+{application, erlastica, [
+  {description, "ElasticSearch client"},
+  {vsn, git},
+  {registered, [erlastica_sup]},
+  {included_applications, []},
+  {applications, [
+    kernel,
+    stdlib,
+    compiler,
+    syntax_tools,
+    lager,
+    crypto,
+    asn1,
+    public_key,
+    ssl,
+    ibrowse,
+    egetter
+  ]},
+  {mod, {erlastica_app, []}},
+  {env, []}
+]}.
