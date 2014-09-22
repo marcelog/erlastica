@@ -10,6 +10,7 @@
 -export([delete_index/1]).
 -export([create_index/2]).
 -export([index/3, index/4]).
+-export([scan/4, scan/5]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Types.
@@ -32,6 +33,7 @@
 -type index():: atom().
 -type type():: string().
 -type doc():: ejson().
+-type querydoc():: ejson().
 -export_type([index/0, type/0, doc/0]).
 
 -type index_option()::
@@ -108,6 +110,32 @@ index(IndexName, Type, Doc, Options) ->
   end,
   req(IndexName, post, Doc, [Type] ++ [Id], [], QueryString, [200, 201, 204]).
 
+%% @doc Does a scroll&scan, as documented here: 
+%% http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/search-request-scroll.html#scroll-scan
+%% CursorTime is something like "30s", "1m", etc.
+%% The callback function will be called with every set of results as the scroll
+%% goes on.
+-spec scan(index(), querydoc(), string(), function()) -> ok.
+scan(IndexName, Query, CursorTime, Fun) ->
+  scan(IndexName, "", Query, CursorTime, Fun).
+
+-spec scan(index(), type(), querydoc(), string(), function()) -> ok.
+scan(IndexName, DocType, Query, CursorTime, Fun) ->
+  Path = case DocType of
+    "" -> ["_search"];
+    DocType -> [DocType, "_search"]
+  end,
+  {ok, 200, _Headers, {Body}} = req(
+    IndexName, get, Query, Path, [],
+    [{"scroll", CursorTime}, {"search_type", "scan"}], [200]
+  ),
+  ScrollId = proplists:get_value(<<"_scroll_id">>, Body),
+  Total = case proplists:get_value(<<"hits">>, Body) of
+    undefined -> 0;
+    {HitsBody} -> proplists:get_value(<<"total">>, HitsBody)
+  end,
+  scroll(IndexName, CursorTime, binary_to_list(ScrollId), 0, Total, Fun).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Private API.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -125,6 +153,33 @@ index_host_config(Index) ->
     proplists:get_value(port, HostConfig)
   }.
 
+-spec scroll(
+  index(), string(), string(),
+  non_neg_integer(), non_neg_integer(), function()
+) -> ok.
+scroll(_IndexName, _CursorTime, _ScrollId, Total, Total, _Fun) ->
+  ok;
+
+scroll(IndexName, CursorTime, ScrollId, Current, Total, Fun) ->
+  lager:debug("Scrolling: ~p / ~p", [Current, Total]),
+  {ok, 200, _Headers, {Body}} = req(
+    IndexName, get, {[]}, ["_search", "scroll"], [], [
+      {"scroll", CursorTime},
+      {"search_type", "scan"},
+      {"scroll_id", ScrollId}
+    ], [200]
+  ),
+  NewScrollId = proplists:get_value(<<"_scroll_id">>, Body),
+  Hits = case proplists:get_value(<<"hits">>, Body) of
+    undefined -> 0;
+    {HitsBody} -> proplists:get_value(<<"hits">>, HitsBody)
+  end,
+  Fun(Hits, Total),
+  scroll(
+    IndexName, CursorTime, binary_to_list(NewScrollId),
+    Current + length(Hits), Total, Fun
+  ).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Private API.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -137,6 +192,10 @@ req(
   IndexName, Method, Body, PathComponents, Options, QueryString, OkStatuses
 ) ->
   {Index, Host, Port} = index_host_config(IndexName),
+  Path = case PathComponents -- ["scroll"] of
+    PathComponents -> [Index|PathComponents];
+    _ -> PathComponents
+  end,
   {_, RStatus, RHeaders, RBody} = egetter:req(Options ++ [
     {host, Host},
     {port, Port},
@@ -146,7 +205,7 @@ req(
     {ibrowse_options, cfg_get(ibrowse_options, [])},
     {use_proxy, false},
     {follow_redirect, false},
-    {path_components, [Index|PathComponents]},
+    {path_components, Path},
     {query_string, QueryString}
   ]),
   Json = jiffy:decode(RBody),
