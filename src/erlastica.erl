@@ -11,6 +11,7 @@
 -export([create_index/2]).
 -export([index/3, index/4]).
 -export([scan/4, scan/5]).
+-export([find/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Types.
@@ -110,7 +111,7 @@ index(IndexName, Type, Doc, Options) ->
   end,
   req(IndexName, post, Doc, [Type] ++ [Id], [], QueryString, [200, 201, 204]).
 
-%% @doc Does a scroll&scan, as documented here: 
+%% @doc Does a scroll&scan, as documented here:
 %% http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/search-request-scroll.html#scroll-scan
 %% CursorTime is something like "30s", "1m", etc.
 %% The callback function will be called with every set of results as the scroll
@@ -135,6 +136,13 @@ scan(IndexName, DocType, Query, CursorTime, Fun) ->
     {HitsBody} -> proplists:get_value(<<"total">>, HitsBody)
   end,
   scroll(IndexName, CursorTime, binary_to_list(ScrollId), 0, Total, Fun).
+
+-spec find(index(), querydoc()) ->ok.
+find(IndexName, Query) ->
+  {ok, 200, _Headers, Body} = req(
+    IndexName, get, Query, ["_search"], [], [], [200]
+  ),
+  Body.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Private API.
