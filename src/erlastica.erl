@@ -146,10 +146,14 @@ find(IndexName, Query) ->
 
 -spec find_by_id(index(), type(), string()) -> ejson().
 find_by_id(IndexName, Type, Id) ->
-  {ok, 200, _Headers, Body} = req(
-    IndexName, get, {[]}, [Type, Id], [], [], [200]
+  {ok, Status, _Headers, Body} = req(
+    IndexName, get, {[]}, [Type, Id], [], [], [200, 404]
   ),
-  Body.
+  case Status of
+    404 -> undefined;
+    200 -> Body
+  end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Private API.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
