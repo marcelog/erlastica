@@ -11,7 +11,7 @@
 -export([create_index/2]).
 -export([index/3, index/4]).
 -export([scan/4, scan/5]).
--export([find/2]).
+-export([find/2, find_by_id/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Types.
@@ -137,13 +137,19 @@ scan(IndexName, DocType, Query, CursorTime, Fun) ->
   end,
   scroll(IndexName, CursorTime, binary_to_list(ScrollId), 0, Total, Fun).
 
--spec find(index(), querydoc()) ->ok.
+-spec find(index(), querydoc()) -> ejson().
 find(IndexName, Query) ->
   {ok, 200, _Headers, Body} = req(
     IndexName, get, Query, ["_search"], [], [], [200]
   ),
   Body.
 
+-spec find_by_id(index(), type(), string()) -> ejson().
+find_by_id(IndexName, Type, Id) ->
+  {ok, 200, _Headers, Body} = req(
+    IndexName, get, {[]}, [Type, Id], [], [], [200]
+  ),
+  Body.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Private API.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
