@@ -189,7 +189,7 @@ scroll(IndexName, CursorTime, ScrollId, Current, Total, Fun) ->
   ),
   NewScrollId = proplists:get_value(<<"_scroll_id">>, Body),
   Hits = case proplists:get_value(<<"hits">>, Body) of
-    undefined -> 0;
+    undefined -> [];
     {HitsBody} -> proplists:get_value(<<"hits">>, HitsBody)
   end,
   Fun(Hits, Total),
